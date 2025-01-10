@@ -17,7 +17,7 @@ class ChatbotOrchestrator:
     def __init__(self, website_url: str):
         self.website_url = website_url
         self.web_scraper = WebScrapingAgent(website_url)
-        self.visual_scraper = VisualScrapingAgent()
+        self.visual_scraper = VisualScrapingAgent(website_url)
         self.processor = DataProcessingAgent()
         self.chatbot: Optional[WebsiteChatbot] = None
         
