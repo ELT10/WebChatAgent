@@ -1,0 +1,8 @@
+To run:
+python main.py --url "https://example.com"
+
+To force scrape:
+python main.py --url "https://example.com" --force-scrape
+
+To clear chat history:
+clear

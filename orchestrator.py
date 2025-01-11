@@ -1,6 +1,7 @@
 from scraping_agents import WebScrapingAgent, VisualScrapingAgent
 from data_processor import DataProcessingAgent
 from chatbot import WebsiteChatbot
+from translation_service import TranslationService
 from typing import List, Dict, Optional
 import logging
 import json
@@ -19,6 +20,7 @@ class ChatbotOrchestrator:
         self.web_scraper = WebScrapingAgent(website_url)
         self.visual_scraper = VisualScrapingAgent(website_url)
         self.processor = DataProcessingAgent()
+        self.translator = TranslationService()
         self.chatbot: Optional[WebsiteChatbot] = None
         
     async def initialize(self, force_scrape: bool = False) -> None:
@@ -66,14 +68,39 @@ class ChatbotOrchestrator:
     
     async def chat(self, query: str) -> Dict:
         """
-        Send a query to the chatbot and get a response.
+        Handle chat with translation support.
         """
         if not self.chatbot:
             raise RuntimeError("Chatbot not initialized. Please call initialize() first.")
             
         try:
-            response = await self.chatbot.get_response(query)
+            # Handle potential Malayalam transliteration
+            if self.translator.is_malayalam_transliterated(query):
+                query = self.translator.transliterate_malayalam(query, to_malayalam=True)
+            
+            # Translate query to English
+            english_query, source_lang = await self.translator.translate_text(query, target_lang='en')
+            
+            # Get response from chatbot
+            response = await self.chatbot.get_response(english_query)
+            
+            # Translate response back to source language if not English
+            if source_lang != 'en':
+                translated_answer, _ = await self.translator.translate_text(
+                    response["answer"], 
+                    target_lang=source_lang
+                )
+                response["answer"] = translated_answer
+                
+                # If original query was transliterated Malayalam, convert response to English script
+                if self.translator.is_malayalam_transliterated(query):
+                    response["answer"] = self.translator.transliterate_malayalam(
+                        response["answer"], 
+                        to_malayalam=False
+                    )
+            
             return response
+            
         except Exception as e:
             logger.error(f"Error during chat: {e}")
             return {
