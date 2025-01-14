@@ -67,37 +67,47 @@ class ChatbotOrchestrator:
                 os.path.exists("visual_scraping_results.json"))
     
     async def chat(self, query: str) -> Dict:
-        """
-        Handle chat with translation support.
-        """
-        if not self.chatbot:
-            raise RuntimeError("Chatbot not initialized. Please call initialize() first.")
-            
+        """Process chat query and return response."""
         try:
-            # Handle potential Malayalam transliteration
-            if self.translator.is_malayalam_transliterated(query):
-                query = self.translator.transliterate_malayalam(query, to_malayalam=True)
+            # Detect input language
+            input_lang = self.translator.detect_language(query)
+            logger.info(f"Detected language: {input_lang}")
             
-            # Translate query to English
-            english_query, source_lang = await self.translator.translate_text(query, target_lang='en')
+            # Translate query to English for processing
+            if input_lang != 'en':
+                translated_query, _ = await self.translator.translate_text(query, target_lang='en')
+                logger.info(f"Translated query: {translated_query}")
+            else:
+                translated_query = query
             
             # Get response from chatbot
-            response = await self.chatbot.get_response(english_query)
+            response = await self.chatbot.get_response(translated_query)
             
-            # Translate response back to source language if not English
-            if source_lang != 'en':
+            # Handle response translation based on input language
+            if input_lang == 'ml':
+                # Translate to Malayalam script
                 translated_answer, _ = await self.translator.translate_text(
                     response["answer"], 
-                    target_lang="en"
+                    target_lang='ml'
                 )
                 response["answer"] = translated_answer
                 
-                # If original query was transliterated Malayalam, convert response to English script
-                if self.translator.is_malayalam_transliterated(query):
-                    response["answer"] = self.translator.transliterate_malayalam(
-                        response["answer"], 
-                        to_malayalam=False
-                    )
+            elif input_lang == 'manglish':
+                logger.info("Converting response to Manglish...")
+                # First translate to Malayalam
+                ml_answer, _ = await self.translator.translate_text(
+                    response["answer"], 
+                    target_lang='ml'
+                )
+                logger.info(f"Malayalam translation: {ml_answer}")
+                
+                # Then convert Malayalam to Manglish
+                manglish_answer = self.translator.transliterate_malayalam(
+                    ml_answer, 
+                    to_malayalam=False
+                )
+                logger.info(f"Final Manglish answer: {manglish_answer}")
+                response["answer"] = manglish_answer
             
             return response
             
