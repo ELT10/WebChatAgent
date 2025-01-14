@@ -4,92 +4,133 @@ from langchain.vectorstores import Chroma
 from langchain.schema import Document
 import json
 import os
-from typing import List, Dict
 import logging
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
+from typing import List, Dict
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class DataProcessingAgent:
     def __init__(self, 
-                 chunk_size: int = 1000,
-                 chunk_overlap: int = 200,
+                 chunk_size: int = 1000,  # Increased chunk size for better context
+                 chunk_overlap: int = 200,  # Increased overlap
                  persist_directory: str = "./data/chroma_db"):
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             length_function=len,
-            is_separator_regex=False,
+            separators=["\n\n", "\n", ". ", " ", ""]
         )
         self.embeddings = OpenAIEmbeddings()
         self.persist_directory = persist_directory
-        
-    def _load_json_data(self, filename: str) -> List[Dict]:
-        """Load data from JSON file."""
-        try:
-            with open(filename, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"Error loading {filename}: {e}")
-            return []
 
-    def _combine_scraped_data(self) -> List[Dict]:
-        """Combine data from both web scraping and visual scraping."""
-        web_data = self._load_json_data("web_scraping_results.json")
-        visual_data = self._load_json_data("visual_scraping_results.json")
+    def _create_structured_content(self, item: Dict) -> str:
+        """Create well-structured content from a page item."""
+        content_parts = []
         
-        # Handle case where visual_data is a single dictionary
-        if isinstance(visual_data, dict):
-            visual_data = [visual_data]
+        # Add title
+        if item.get('title'):
+            content_parts.append(f"Page: {item['title']}")
+        
+        # Add description from metadata if available
+        if item.get('metadata', {}).get('description'):
+            content_parts.append(f"Description: {item['metadata']['description']}")
+        
+        # Process headings hierarchically
+        if item.get('headings'):
+            current_section = []
+            for heading in item['headings']:
+                level = int(heading['level'].replace('h', ''))
+                text = heading['text']
+                current_section = current_section[:level-1] + [text]
+                content_parts.append(f"Section {' > '.join(current_section)}")
+        
+        # Add main content with proper context
+        if item.get('main_content'):
+            content_parts.append(f"Content: {item['main_content']}")
             
-        return web_data + visual_data
+        return "\n\n".join(content_parts)
 
-    def _prepare_documents(self, data: List[Dict]) -> List[Document]:
-        """Split text into chunks and prepare documents."""
+    def _clean_metadata(self, metadata: Dict) -> Dict:
+        """Clean metadata to ensure only simple types are stored."""
+        cleaned = {}
+        for key, value in metadata.items():
+            if isinstance(value, (str, int, float, bool)):
+                cleaned[key] = value
+            elif isinstance(value, list):
+                # Convert lists to comma-separated strings
+                cleaned[key] = ", ".join(str(v) for v in value)
+            elif isinstance(value, dict):
+                # Convert dicts to string representation
+                cleaned[key] = str(value)
+            elif value is None:
+                cleaned[key] = ""
+            else:
+                # Convert any other types to string
+                cleaned[key] = str(value)
+        return cleaned
+
+    def _prepare_documents(self, scraped_data: List[Dict]) -> List[Document]:
+        """Prepare documents with better structure and metadata."""
         documents = []
-        for item in data:
-            if not item.get('content'):
+        
+        for item in scraped_data:
+            # Skip error pages or empty content
+            if "page not found" in item.get('title', '').lower():
                 continue
                 
-            chunks = self.text_splitter.split_text(item['content'])
-            documents.extend([
-                Document(
-                    page_content=chunk,
-                    metadata={
-                        "source": item['url'],
-                        "chunk_type": "text"
-                    }
-                ) for chunk in chunks
-            ])
+            # Create structured content
+            structured_content = self._create_structured_content(item)
+            
+            # Clean metadata
+            clean_metadata = self._clean_metadata({
+                'source': item['url'],
+                'title': item.get('title', ''),
+                'type': 'content',
+                'description': item.get('metadata', {}).get('description', ''),
+                'sections': [h['text'] for h in item.get('headings', [])],
+                'page_type': item.get('metadata', {}).get('og:type', 'page')
+            })
+            
+            # Split content into chunks while maintaining context
+            chunks = self.text_splitter.split_text(structured_content)
+            
+            for chunk in chunks:
+                documents.append(
+                    Document(
+                        page_content=chunk,
+                        metadata=clean_metadata
+                    )
+                )
+        
         return documents
 
     async def process_data(self) -> Chroma:
         """Process scraped data and create vector store."""
-        logger.info("Starting data processing...")
-        
-        # Create persist directory if it doesn't exist
-        os.makedirs(self.persist_directory, exist_ok=True)
-        
-        # Load and combine data
-        combined_data = self._combine_scraped_data()
-        if not combined_data:
-            raise ValueError("No data found to process")
+        try:
+            os.makedirs(self.persist_directory, exist_ok=True)
             
-        # Prepare documents
-        documents = self._prepare_documents(combined_data)
-        logger.info(f"Prepared {len(documents)} document chunks")
-        
-        # Create and persist vector store
-        vectorstore = Chroma.from_documents(
-            documents=documents,
-            embedding=self.embeddings,
-            persist_directory=self.persist_directory
-        )
-        vectorstore.persist()
-        
-        logger.info("Data processing completed and vector store created")
-        return vectorstore 
+            # Load scraped data
+            with open('web_scraping_results.json', 'r', encoding='utf-8') as f:
+                scraped_data = json.load(f)
+            
+            if not scraped_data:
+                raise ValueError("No data found to process")
+            
+            # Prepare documents
+            documents = self._prepare_documents(scraped_data)
+            logger.info(f"Prepared {len(documents)} documents")
+            
+            # Create and persist vector store
+            vectorstore = Chroma.from_documents(
+                documents=documents,
+                embedding=self.embeddings,
+                persist_directory=self.persist_directory
+            )
+            vectorstore.persist()
+            
+            return vectorstore
+            
+        except Exception as e:
+            logger.error(f"Error during data processing: {e}")
+            raise 

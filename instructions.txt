@@ -6,3 +6,6 @@ python main.py --url "https://example.com" --force-scrape
 
 To clear chat history:
 clear
+
+To run webapp:
+python app.py 

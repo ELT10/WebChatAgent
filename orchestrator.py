@@ -51,7 +51,7 @@ class ChatbotOrchestrator:
                 
             # Perform visual scraping
             await self.visual_scraper.setup()
-            visual_data = await self.visual_scraper.capture_and_extract(self.website_url)
+            visual_data = await self.visual_scraper.scrape_site()
             await self.visual_scraper.cleanup()
             
             with open("visual_scraping_results.json", "w", encoding="utf-8") as f:
@@ -88,7 +88,7 @@ class ChatbotOrchestrator:
             if source_lang != 'en':
                 translated_answer, _ = await self.translator.translate_text(
                     response["answer"], 
-                    target_lang=source_lang
+                    target_lang="en"
                 )
                 response["answer"] = translated_answer
                 

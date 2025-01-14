@@ -62,4 +62,4 @@ class TranslationService:
                 return transliterate(text, sanscript.MALAYALAM, sanscript.ITRANS)
         except Exception as e:
             logger.error(f"Transliteration error: {e}")
-            return text 
+            return text
