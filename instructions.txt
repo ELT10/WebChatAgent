@@ -10,4 +10,5 @@ clear
 To run webapp:
 python app.py 
 
-yes
+source venvmain/bin/activate && python app.py
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload

@@ -1,6 +1,7 @@
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
 from langchain.schema import Document
 import json
 import os
@@ -12,17 +13,28 @@ logger = logging.getLogger(__name__)
 
 class DataProcessingAgent:
     def __init__(self, 
-                 chunk_size: int = 1000,  # Increased chunk size for better context
-                 chunk_overlap: int = 200,  # Increased overlap
-                 persist_directory: str = "./data/chroma_db"):
+                 chunk_size: int = 1000,
+                 chunk_overlap: int = 200,
+                 persist_directory: str = "./data/chroma_db",
+                 embedding_type: str = "local",
+                 local_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"):
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             length_function=len,
             separators=["\n\n", "\n", ". ", " ", ""]
         )
-        self.embeddings = OpenAIEmbeddings()
-        self.persist_directory = persist_directory
+        embedding_type = (embedding_type or "local").lower()
+        if embedding_type == "local":
+            logger.info("Using local HuggingFace embeddings (no API cost)")
+            self.embeddings = HuggingFaceEmbeddings(model_name=local_embedding_model)
+        else:
+            logger.info("Using OpenAI embeddings (paid API)")
+            self.embeddings = OpenAIEmbeddings()
+
+        suffix = "local" if embedding_type == "local" else "openai"
+        self.persist_directory = os.path.join(persist_directory, suffix)
+        logger.info(f"Persist directory set to {self.persist_directory}")
 
     def _create_structured_content(self, item: Dict) -> str:
         """Create well-structured content from a page item."""

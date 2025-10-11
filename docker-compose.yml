@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  chatbot:
+    build: .
+    ports:
+      - "8001:8001"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - BASE_URL=${BASE_URL:-https://sreesuryaayurveda.com}
+      - HOST=0.0.0.0
+      - PORT=8001
+      - MAX_PAGES_TO_SCRAPE=${MAX_PAGES_TO_SCRAPE:-100}
+      - CHUNK_SIZE=${CHUNK_SIZE:-1000}
+      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-200}
+    volumes:
+      - ./data:/app/data
+      - ./cache:/app/cache
+      - ./web_scraping_results.json:/app/web_scraping_results.json
+      - ./visual_scraping_results.json:/app/visual_scraping_results.json
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+

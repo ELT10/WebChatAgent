@@ -1,6 +1,7 @@
 from scraping_agents import WebScrapingAgent, VisualScrapingAgent
 from data_processor import DataProcessingAgent
 from chatbot import WebsiteChatbot
+from config import Config
 from translation_service import TranslationService
 from typing import List, Dict, Optional
 import logging
@@ -19,7 +20,12 @@ class ChatbotOrchestrator:
         self.website_url = website_url
         self.web_scraper = WebScrapingAgent(website_url)
         self.visual_scraper = VisualScrapingAgent(website_url)
-        self.processor = DataProcessingAgent()
+        self.processor = DataProcessingAgent(
+            embedding_type=Config.EMBEDDING_TYPE,
+            local_embedding_model=Config.LOCAL_EMBEDDING_MODEL,
+            chunk_size=1000,
+            chunk_overlap=200,
+        )
         self.translator = TranslationService()
         self.chatbot: Optional[WebsiteChatbot] = None
         
@@ -34,7 +40,18 @@ class ChatbotOrchestrator:
             
             logger.info("Processing data and initializing chatbot...")
             vectorstore = await self.processor.process_data()
-            self.chatbot = WebsiteChatbot(vectorstore)
+            self.chatbot = WebsiteChatbot(
+                vectorstore,
+                model=Config.CHAT_MODEL,
+                fallback_model=Config.FALLBACK_CHAT_MODEL,
+                temperature=Config.TEMPERATURE,
+                max_history_tokens=Config.MAX_HISTORY_TOKENS,
+                memory_summarizer_model=Config.MEMORY_SUMMARIZER_MODEL,
+                retrieval_k=Config.RETRIEVAL_K,
+                enable_caching=Config.ENABLE_CACHING,
+                enable_compression=Config.ENABLE_COMPRESSION,
+                cache_ttl_hours=Config.CACHE_TTL_HOURS,
+            )
             logger.info("Chatbot initialization complete!")
             
         except Exception as e:
@@ -121,4 +138,4 @@ class ChatbotOrchestrator:
     def clear_chat_history(self) -> None:
         """Clear the chatbot's conversation history."""
         if self.chatbot:
-            self.chatbot.clear_history() 
+            self.chatbot.memory.clear() 
