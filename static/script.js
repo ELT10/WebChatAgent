@@ -59,7 +59,8 @@ async function initializeChatbot() {
             document.getElementById('chatContainer').style.display = 'block';
             
             // Add welcome message
-            displayMessage('Chatbot initialized! How can I help you?', 'bot');
+            const welcomeMessage = data.message || 'Hi there! How can I help you?';
+            displayMessage(welcomeMessage, 'bot');
             
             // Initialize WebSocket connection
             initializeWebSocket();

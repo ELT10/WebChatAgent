@@ -73,7 +73,7 @@ async def initialize_chatbot(request: InitializeRequest):
         logger.info("Chatbot initialized successfully")
         return {
             "status": "success", 
-            "message": "Chatbot initialized successfully",
+            "message": "Hi there! How can I help you?",
             "website_url": request.website_url
         }
     except ValueError as e:
