@@ -7,26 +7,49 @@
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
+    <div class="background-glow" aria-hidden="true"></div>
     <div class="container">
-        <div class="setup-container" id="setupContainer">
-            <h2>Initialize Chatbot</h2>
-            <div class="input-group">
-                <input type="text" id="websiteUrl" placeholder="Enter website URL">
-                <div class="checkbox-group">
-                    <input type="checkbox" id="forceScrape">
-                    <label for="forceScrape">Force new scraping</label>
-                </div>
-                <button onclick="initializeChatbot()">Initialize</button>
+        <header class="app-header">
+            <div class="brand">
+                <span class="brand-mark"></span>
+                <h1>Website Chatbot</h1>
             </div>
-        </div>
+            <p class="subtitle">Conversational answers tailored to your site.</p>
+        </header>
 
-        <div class="chat-container" id="chatContainer" style="display: none;">
-            <div class="chat-messages" id="chatMessages"></div>
-            <div class="chat-input-container">
-                <input type="text" id="messageInput" placeholder="Type your message...">
-                <button onclick="sendMessage()">Send</button>
-            </div>
-        </div>
+        <main class="panels">
+            <section class="panel setup-container" id="setupContainer">
+                <h2>Initialize Chatbot</h2>
+                <p class="muted">Connect your website and start a chat experience instantly.</p>
+                <div class="input-group">
+                    <div class="field">
+                        <label for="websiteUrl">Website URL</label>
+                        <input type="text" id="websiteUrl" placeholder="https://example.com">
+                    </div>
+                    <div class="field-row">
+                        <label class="checkbox">
+                            <input type="checkbox" id="forceScrape">
+                            <span>Force new scraping</span>
+                        </label>
+                        <button class="primary" onclick="initializeChatbot()">
+                            <span>Initialize</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel chat-container" id="chatContainer" style="display: none;">
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="chat-input-container">
+                    <input type="text" id="messageInput" placeholder="Ask anything about the site...">
+                    <button class="primary" onclick="sendMessage()">Send</button>
+                </div>
+            </section>
+        </main>
+
+        <footer class="app-footer">
+            <span>Built for clarity. Styled for focus.</span>
+        </footer>
 
         <div class="loading-overlay" id="loadingOverlay" style="display: none;">
             <div class="loader"></div>
