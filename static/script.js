@@ -1,5 +1,7 @@
 let ws = null;
 let isProcessing = false;
+let currentBotMessageDiv = null;
+let currentBotMessageContent = null;
 
 function showLoading(message = 'Processing...') {
     const overlay = document.getElementById('loadingOverlay');
@@ -103,19 +105,81 @@ function initializeWebSocket() {
     };
 
     ws.onmessage = function(event) {
-        isProcessing = false;
         const response = JSON.parse(event.data);
+        console.log('Received message:', response);
         
-        if (response.error) {
-            displayMessage(`Error: ${response.error}`, 'error');
+        // Handle streaming chunks
+        if (response.type === 'chunk') {
+            console.log('Chunk received:', response.content);
+            
+            // Remove typing indicator on first chunk
+            if (!currentBotMessageDiv) {
+                removeTypingIndicator();
+                currentBotMessageDiv = createStreamingMessage();
+                currentBotMessageContent = '';
+                console.log('Created new streaming message box');
+            }
+            
+            // Append chunk to content
+            currentBotMessageContent += response.content;
+            updateStreamingMessage(currentBotMessageDiv, currentBotMessageContent);
+            
+        } else if (response.type === 'done') {
+            console.log('Stream done, content length:', response.content ? response.content.length : 0);
+            
+            // Remove typing indicator
+            removeTypingIndicator();
+            
+            if (currentBotMessageDiv) {
+                // Use accumulated content if we have it, otherwise use response content
+                const finalContent = currentBotMessageContent || response.content;
+                console.log('Finalizing existing message box with accumulated content length:', finalContent ? finalContent.length : 0);
+                finalizeStreamingMessage(currentBotMessageDiv, finalContent, response.sources || []);
+            } else {
+                // Fallback if no streaming happened (non-English or cached response)
+                console.log('No streaming box, creating new message');
+                displayMessage(response.content, 'bot', response.sources || []);
+            }
+            
+            // Reset streaming state
+            currentBotMessageDiv = null;
+            currentBotMessageContent = null;
+            isProcessing = false;
+            
+            // Re-enable input
+            const messageInput = document.getElementById('messageInput');
+            messageInput.disabled = false;
+            messageInput.focus();
+            
+        } else if (response.type === 'error' || response.error) {
+            console.error('Error response:', response);
+            removeTypingIndicator();
+            const errorMsg = response.content || response.error || 'Unknown error';
+            displayMessage(`Error: ${errorMsg}`, 'error');
+            
+            // Reset streaming state
+            currentBotMessageDiv = null;
+            currentBotMessageContent = null;
+            isProcessing = false;
+            
+            // Re-enable input
+            const messageInput = document.getElementById('messageInput');
+            messageInput.disabled = false;
+            messageInput.focus();
         } else {
-            displayMessage(response.answer, 'bot', response.sources);
+            // Handle legacy response format (backward compatibility)
+            console.log('Legacy response format detected');
+            removeTypingIndicator();
+            if (response.answer) {
+                displayMessage(response.answer, 'bot', response.sources);
+            } else if (response.error) {
+                displayMessage(`Error: ${response.error}`, 'error');
+            }
+            isProcessing = false;
+            const messageInput = document.getElementById('messageInput');
+            messageInput.disabled = false;
+            messageInput.focus();
         }
-        
-        // Re-enable input
-        const messageInput = document.getElementById('messageInput');
-        messageInput.disabled = false;
-        messageInput.focus();
     };
 
     ws.onerror = function(error) {
@@ -138,6 +202,10 @@ function sendMessage() {
     const message = messageInput.value.trim();
 
     if (!message) return;
+
+    // Reset streaming state before new message
+    currentBotMessageDiv = null;
+    currentBotMessageContent = null;
 
     // Display user message
     displayMessage(message, 'user');
@@ -173,6 +241,80 @@ function removeTypingIndicator() {
     if (typingIndicator) {
         typingIndicator.remove();
     }
+}
+
+function createStreamingMessage() {
+    removeTypingIndicator();
+    
+    const chatMessages = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message bot-message streaming';
+    
+    // Create message content div
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    messageDiv.appendChild(contentDiv);
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    return messageDiv;
+}
+
+function updateStreamingMessage(messageDiv, content) {
+    const contentDiv = messageDiv.querySelector('.message-content');
+    if (contentDiv) {
+        contentDiv.textContent = content;
+        const chatMessages = document.getElementById('chatMessages');
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+}
+
+function finalizeStreamingMessage(messageDiv, finalContent, sources = []) {
+    console.log('Finalizing message with content:', finalContent ? finalContent.substring(0, 50) : 'EMPTY');
+    
+    // Remove streaming class
+    messageDiv.classList.remove('streaming');
+    
+    // Update final content - make sure we have content
+    const contentDiv = messageDiv.querySelector('.message-content');
+    if (contentDiv && finalContent) {
+        contentDiv.textContent = finalContent;
+    } else if (contentDiv) {
+        contentDiv.textContent = 'No response generated.';
+        console.warn('No content to display!');
+    }
+    
+    // Add sources if present and we have content
+    if (sources && sources.length > 0 && finalContent) {
+        const sourcesDiv = document.createElement('div');
+        sourcesDiv.className = 'sources';
+        sourcesDiv.innerHTML = '<strong>Sources:</strong><br>';
+        
+        sources.forEach((source, index) => {
+            const sourceLink = document.createElement('a');
+            sourceLink.href = source;
+            sourceLink.textContent = source;
+            sourceLink.target = '_blank';
+            sourceLink.rel = 'noopener noreferrer';
+            sourcesDiv.appendChild(sourceLink);
+            
+            if (index < sources.length - 1) {
+                sourcesDiv.appendChild(document.createElement('br'));
+            }
+        });
+        
+        messageDiv.appendChild(sourcesDiv);
+    }
+    
+    // Add timestamp
+    const timestamp = document.createElement('div');
+    timestamp.className = 'timestamp';
+    timestamp.textContent = new Date().toLocaleTimeString();
+    messageDiv.appendChild(timestamp);
+    
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 function displayMessage(message, type, sources = []) {

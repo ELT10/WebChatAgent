@@ -28,6 +28,10 @@ class Config:
     EMBEDDING_TYPE = os.getenv('EMBEDDING_TYPE', 'local').strip().lower()  # 'local' or 'openai'
     LOCAL_EMBEDDING_MODEL = os.getenv('LOCAL_EMBEDDING_MODEL', 'sentence-transformers/all-MiniLM-L6-v2')
     
+    # AI Content Enhancement (NEW)
+    ENABLE_AI_ENHANCEMENT = os.getenv('ENABLE_AI_ENHANCEMENT', 'true').strip().lower() in ('1', 'true', 'yes', 'y')
+    ENHANCEMENT_MODEL = os.getenv('ENHANCEMENT_MODEL', 'gpt-4o-mini')  # 'gpt-4o-mini', 'gpt-3.5-turbo', etc.
+    
     @classmethod
     def validate(cls):
         if not cls.OPENAI_API_KEY:

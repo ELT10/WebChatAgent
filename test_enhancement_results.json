@@ -1,0 +1,90 @@
+[
+  {
+    "url": "https://example-clinic.com/services",
+    "title": "Services - Health Clinic",
+    "headings": [
+      {
+        "level": "h1",
+        "text": "Our Services"
+      },
+      {
+        "level": "h2",
+        "text": "Treatments"
+      },
+      {
+        "level": "h3",
+        "text": "Acne"
+      },
+      {
+        "level": "h3",
+        "text": "Diabetes"
+      }
+    ],
+    "main_content": {
+      "introduction": "We offer various health treatments and services for your wellness needs.",
+      "services": [
+        {
+          "name": "Acne",
+          "description": "Comprehensive treatments for acne management."
+        },
+        {
+          "name": "Diabetes",
+          "description": "Support and treatment options for diabetes care."
+        },
+        {
+          "name": "Hair Loss",
+          "description": "Solutions and treatments for hair loss."
+        }
+      ],
+      "testimonials": [
+        {
+          "rating": "★★★★★",
+          "comment": "Great service!"
+        },
+        {
+          "rating": "★★★★★",
+          "comment": "Highly recommend!"
+        }
+      ],
+      "contact_information": "For more information, please contact us."
+    },
+    "metadata": {
+      "description": "We offer various health treatments and services for your wellness needs."
+    },
+    "enhanced": true,
+    "business_context": "Health Clinic",
+    "content_type": "service",
+    "key_information": [
+      "Health Clinic",
+      "Services offered: Acne, Diabetes, Hair Loss",
+      "Testimonials: Great service, Highly recommend"
+    ]
+  },
+  {
+    "url": "https://example-clinic.com/about",
+    "title": "About Us",
+    "headings": [
+      {
+        "level": "h1",
+        "text": "About Our Clinic"
+      }
+    ],
+    "main_content": {
+      "introduction": "We are a leading healthcare provider exercising the highest standards.",
+      "team": "Our team of experts is dedicated to providing exceptional care.",
+      "contact": "Contact us today for more information."
+    },
+    "metadata": {
+      "description": "Learn more about our clinic and our team"
+    },
+    "enhanced": true,
+    "business_context": "Example Clinic",
+    "content_type": "about",
+    "key_information": [
+      "Leading healthcare provider",
+      "Highest standards of care",
+      "Expert team",
+      "Contact available for inquiries"
+    ]
+  }
+]

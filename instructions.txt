@@ -12,3 +12,13 @@ python app.py
 
 source venvmain/bin/activate && python app.py
 uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+
+
+To init
+
+cd /Users/eltonthomas/Developer/WebChatAgent
+python3 -m venv venvmain
+source /Users/eltonthomas/Developer/WebChatAgent/venvmain/bin/activate
+python -m pip install --upgrade pip
+pip install -r /Users/eltonthomas/Developer/WebChatAgent/requirements.txt
+playwright install chromium

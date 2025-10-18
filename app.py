@@ -115,30 +115,44 @@ async def websocket_endpoint(websocket: WebSocket):
             message = await websocket.receive_text()
             
             if not message or not message.strip():
+                logger.warning("⚠️ Empty message received from client")
                 await websocket.send_json({
                     "error": "Empty message received"
                 })
                 continue
             
-            logger.info(f"Received message: {message[:100]}...")
+            logger.info(f"📨 Received message from client: '{message[:100]}...'")
             
-            # Get chatbot response
-            response = await chatbot_instance.chat(message)
+            # Stream chatbot response
+            chunk_sent_count = 0
+            logger.info("🎬 Starting to stream response chunks via WebSocket...")
+            async for chunk in chatbot_instance.chat_stream(message):
+                try:
+                    chunk_sent_count += 1
+                    chunk_type = chunk.get('type', 'unknown')
+                    content_preview = chunk.get('content', '')[:50] if chunk.get('content') else ''
+                    logger.info(f"📤 Sending chunk #{chunk_sent_count} to client: type='{chunk_type}', preview='{content_preview}{'...' if len(chunk.get('content', '')) > 50 else ''}'")
+                    await websocket.send_json(chunk)
+                    logger.debug(f"✅ Chunk #{chunk_sent_count} sent successfully")
+                except Exception as send_error:
+                    logger.error(f"❌ Error sending chunk #{chunk_sent_count}: {send_error}")
+                    break
             
-            # Send response back to client
-            await websocket.send_json(response)
-            logger.info("Response sent to client")
+            logger.info(f"✅ Streaming response completed! Total chunks sent: {chunk_sent_count}")
             
     except WebSocketDisconnect:
-        logger.info("WebSocket disconnected")
+        logger.info("🔌 WebSocket disconnected by client")
     except Exception as e:
-        logger.error(f"WebSocket error: {e}", exc_info=True)
+        logger.error(f"❌ WebSocket error: {e}", exc_info=True)
         try:
+            logger.info("📤 Sending error message to client")
             await websocket.send_json({
-                "error": "An error occurred processing your message"
+                "type": "error",
+                "content": "An error occurred processing your message",
+                "sources": []
             })
-        except:
-            pass
+        except Exception as close_error:
+            logger.error(f"❌ Could not send error message: {close_error}")
         await websocket.close()
 
 if __name__ == "__main__":

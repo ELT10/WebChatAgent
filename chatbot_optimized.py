@@ -91,7 +91,8 @@ class OptimizedWebsiteChatbot:
         max_history_tokens: int = 2000,  # Limit conversation history
         retrieval_k: int = 3,  # Reduced from 5
         enable_caching: bool = True,
-        enable_compression: bool = False  # Optional: adds small LLM cost but reduces tokens
+        enable_compression: bool = False,  # Optional: adds small LLM cost but reduces tokens
+        system_prompt: Optional[str] = None
     ):
         """
         Initialize optimized chatbot.
@@ -104,6 +105,7 @@ class OptimizedWebsiteChatbot:
             retrieval_k: Number of documents to retrieve (lower = cheaper)
             enable_caching: Enable response caching
             enable_compression: Enable contextual compression (trades small LLM cost for big token savings)
+            system_prompt: Custom system prompt for the chatbot (optional)
         """
         self.model = model
         self.enable_caching = enable_caching
@@ -145,8 +147,12 @@ class OptimizedWebsiteChatbot:
         else:
             self.retriever = base_retriever
         
-        # Optimized prompt template (shorter = fewer tokens)
-        self.qa_template = """You're a helpful assistant. Answer based on the context below.
+        # Use provided system prompt or default
+        if system_prompt:
+            self.qa_template = system_prompt
+            logger.info("Using custom system prompt")
+        else:
+            self.qa_template = """You're a helpful assistant. Answer based on the context below.
 
 Context: {context}
 
@@ -155,6 +161,7 @@ History: {chat_history}
 Question: {question}
 
 Answer:"""
+            logger.info("Using default system prompt")
         
         self.qa_prompt = PromptTemplate(
             template=self.qa_template,
