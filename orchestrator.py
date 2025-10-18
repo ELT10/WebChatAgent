@@ -107,10 +107,17 @@ class ChatbotOrchestrator:
             else:
                 translated_query = query
             
-            # Get response from chatbot
-            response = await self.chatbot.get_response(translated_query)
+            # Prepare language instruction for LLM
+            lang_instruction = None
+            if input_lang == 'ml':
+                lang_instruction = "Please respond in Malayalam script."
+            elif input_lang == 'manglish':
+                lang_instruction = "Please respond in natural Manglish (Malayalam written in English script). Write it naturally as a Malayalam speaker would type in English letters, like 'acne treatment entha', 'ithinu enthokke options undu', etc."
             
-            # Handle response translation based on input language
+            # Get response from chatbot
+            response = await self.chatbot.get_response(translated_query, language_instruction=lang_instruction)
+            
+            # Only translate for Malayalam script (not Manglish, LLM handles that)
             if input_lang == 'ml':
                 # Translate to Malayalam script
                 translated_answer, _ = await self.translator.translate_text(
@@ -118,23 +125,6 @@ class ChatbotOrchestrator:
                     target_lang='ml'
                 )
                 response["answer"] = translated_answer
-                
-            elif input_lang == 'manglish':
-                logger.info("Converting response to Manglish...")
-                # First translate to Malayalam
-                ml_answer, _ = await self.translator.translate_text(
-                    response["answer"], 
-                    target_lang='ml'
-                )
-                logger.info(f"Malayalam translation: {ml_answer}")
-                
-                # Then convert Malayalam to Manglish
-                manglish_answer = self.translator.transliterate_malayalam(
-                    ml_answer, 
-                    to_malayalam=False
-                )
-                logger.info(f"Final Manglish answer: {manglish_answer}")
-                response["answer"] = manglish_answer
             
             return response
             
@@ -166,48 +156,36 @@ class ChatbotOrchestrator:
                 translated_query = query
                 logger.info("✅ Query is in English, no translation needed")
             
-            # If input is English, use streaming
-            if input_lang == 'en':
-                logger.info("🎬 Using STREAMING response for English query")
+            # Prepare language instruction for LLM if not English
+            lang_instruction = None
+            if input_lang == 'ml':
+                lang_instruction = "Please respond in Malayalam script."
+            elif input_lang == 'manglish':
+                lang_instruction = "Please respond in natural Manglish (Malayalam written in English script). Write it naturally as a Malayalam speaker would type in English letters, like 'acne treatment entha', 'ithinu enthokke options undu', etc."
+            
+            # If input is English or Manglish, use streaming
+            if input_lang in ['en', 'manglish']:
+                logger.info(f"🎬 Using STREAMING response for {input_lang} query")
                 chunk_counter = 0
-                async for chunk in self.chatbot.get_response_stream(translated_query):
+                async for chunk in self.chatbot.get_response_stream(translated_query, language_instruction=lang_instruction):
                     chunk_counter += 1
                     logger.info(f"📦 Yielding chunk #{chunk_counter}: type='{chunk.get('type')}', content_length={len(chunk.get('content', ''))} chars")
                     yield chunk
                 logger.info(f"✅ Streaming complete! Total chunks yielded: {chunk_counter}")
             else:
-                # For non-English, get full response and translate
+                # For Malayalam script, get full response and translate
                 logger.info(f"📄 Using NON-STREAMING response for {input_lang} query")
                 response = await self.chatbot.get_response(translated_query)
                 logger.info(f"✅ Got response, length: {len(response['answer'])} chars")
                 
-                # Handle response translation based on input language
-                if input_lang == 'ml':
-                    logger.info("🔄 Translating response to Malayalam script...")
-                    # Translate to Malayalam script
-                    translated_answer, _ = await self.translator.translate_text(
-                        response["answer"], 
-                        target_lang='ml'
-                    )
-                    response["answer"] = translated_answer
-                    logger.info(f"✅ Malayalam translation complete, length: {len(translated_answer)} chars")
-                    
-                elif input_lang == 'manglish':
-                    logger.info("🔄 Converting response to Manglish...")
-                    # First translate to Malayalam
-                    ml_answer, _ = await self.translator.translate_text(
-                        response["answer"], 
-                        target_lang='ml'
-                    )
-                    logger.info(f"✅ Malayalam translation: {ml_answer[:100]}...")
-                    
-                    # Then convert Malayalam to Manglish
-                    manglish_answer = self.translator.transliterate_malayalam(
-                        ml_answer, 
-                        to_malayalam=False
-                    )
-                    logger.info(f"✅ Manglish conversion complete: {manglish_answer[:100]}...")
-                    response["answer"] = manglish_answer
+                # Translate to Malayalam script
+                logger.info("🔄 Translating response to Malayalam script...")
+                translated_answer, _ = await self.translator.translate_text(
+                    response["answer"], 
+                    target_lang='ml'
+                )
+                response["answer"] = translated_answer
+                logger.info(f"✅ Malayalam translation complete, length: {len(translated_answer)} chars")
                 
                 # Return as single complete chunk
                 logger.info(f"📦 Yielding single 'done' chunk with {len(response['sources'])} sources")

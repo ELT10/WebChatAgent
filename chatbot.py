@@ -154,7 +154,7 @@ class WebsiteChatbot:
             logger.error(f"❌ Failed to initialize OpenAI client: {e}")
             self.openai_client = None
 
-    async def get_response(self, query: str) -> Dict:
+    async def get_response(self, query: str, language_instruction: Optional[str] = None) -> Dict:
         """Get a response from the chatbot for the given query."""
         try:
             cache_key = None
@@ -164,7 +164,13 @@ class WebsiteChatbot:
                 if cached:
                     return cached
             
-            response = self.chain.invoke({"question": query})
+            # Add language instruction to the query if provided
+            if language_instruction:
+                query_with_instruction = f"{query}\n\n{language_instruction}"
+            else:
+                query_with_instruction = query
+            
+            response = self.chain.invoke({"question": query_with_instruction})
             
             sources = []
             for doc in response.get("source_documents", []):
@@ -190,13 +196,15 @@ class WebsiteChatbot:
                 "sources": []
             }
     
-    async def get_response_stream(self, query: str) -> AsyncGenerator[Dict, None]:
+    async def get_response_stream(self, query: str, language_instruction: Optional[str] = None) -> AsyncGenerator[Dict, None]:
         """
         Get a streaming response from the chatbot using OpenAI Responses API.
         This method yields chunks of the response as they arrive.
         """
         try:
             logger.info(f"🔍 Starting streaming response for query: '{query[:80]}...'")
+            if language_instruction:
+                logger.info(f"🌐 Language instruction: {language_instruction}")
             
             # First, retrieve relevant context from the vectorstore
             logger.info("📚 Retrieving relevant documents from vectorstore...")
@@ -236,6 +244,10 @@ Chat History:
 {history_text}
 
 Answer the user's question naturally and helpfully."""
+            
+            # Add language instruction if provided
+            if language_instruction:
+                instructions += f"\n\nIMPORTANT: {language_instruction}"
             
             # Extract sources for later
             sources = []
@@ -318,7 +330,7 @@ Answer the user's question naturally and helpfully."""
                 # Fallback if responses API is not available
                 logger.warning(f"⚠️ Responses API not available, falling back to standard response: {e}")
                 logger.info("🔄 Using LangChain chat completion instead...")
-                result = await self.get_response(query)
+                result = await self.get_response(query, language_instruction=language_instruction)
                 logger.info(f"✅ Fallback response received, length: {len(result['answer'])} chars")
                 yield {
                     "type": "done",
@@ -329,7 +341,7 @@ Answer the user's question naturally and helpfully."""
                 # Handle any other API errors
                 logger.error(f"❌ Error calling Responses API: {api_error}", exc_info=True)
                 logger.info("🔄 Falling back to standard response...")
-                result = await self.get_response(query)
+                result = await self.get_response(query, language_instruction=language_instruction)
                 logger.info(f"✅ Fallback response received, length: {len(result['answer'])} chars")
                 yield {
                     "type": "done",
