@@ -26,6 +26,9 @@ class ChatbotOrchestrator:
             local_embedding_model=Config.LOCAL_EMBEDDING_MODEL,
             chunk_size=1000,
             chunk_overlap=200,
+            enable_ai_enhancement=Config.ENABLE_AI_ENHANCEMENT,
+            enhancement_model=Config.ENHANCEMENT_MODEL,
+            openai_api_key=Config.OPENAI_API_KEY,
         )
         self.translator = TranslationService()
         self.chatbot: Optional[WebsiteChatbot] = None

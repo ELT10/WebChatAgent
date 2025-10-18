@@ -3,10 +3,11 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain.schema import Document
+from content_enhancer import ContentEnhancer
 import json
 import os
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,7 +18,10 @@ class DataProcessingAgent:
                  chunk_overlap: int = 200,
                  persist_directory: str = "./data/chroma_db",
                  embedding_type: str = "local",
-                 local_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"):
+                 local_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
+                 enable_ai_enhancement: bool = True,
+                 enhancement_model: str = "gpt-4o-mini",
+                 openai_api_key: Optional[str] = None):
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
@@ -35,31 +39,68 @@ class DataProcessingAgent:
         suffix = "local" if embedding_type == "local" else "openai"
         self.persist_directory = os.path.join(persist_directory, suffix)
         logger.info(f"Persist directory set to {self.persist_directory}")
+        
+        # Initialize content enhancer
+        self.enable_ai_enhancement = enable_ai_enhancement
+        if self.enable_ai_enhancement:
+            self.enhancer = ContentEnhancer(
+                model=enhancement_model,
+                api_key=openai_api_key
+            )
+            logger.info(f"✨ AI content enhancement ENABLED using {enhancement_model}")
+        else:
+            self.enhancer = None
+            logger.info("⚠️  AI content enhancement DISABLED")
 
     def _create_structured_content(self, item: Dict) -> str:
         """Create well-structured content from a page item."""
         content_parts = []
         
-        # Add title
-        if item.get('title'):
-            content_parts.append(f"Page: {item['title']}")
-        
-        # Add description from metadata if available
-        if item.get('metadata', {}).get('description'):
-            content_parts.append(f"Description: {item['metadata']['description']}")
-        
-        # Process headings hierarchically
-        if item.get('headings'):
-            current_section = []
-            for heading in item['headings']:
-                level = int(heading['level'].replace('h', ''))
-                text = heading['text']
-                current_section = current_section[:level-1] + [text]
-                content_parts.append(f"Section {' > '.join(current_section)}")
-        
-        # Add main content with proper context
-        if item.get('main_content'):
-            content_parts.append(f"Content: {item['main_content']}")
+        # If AI-enhanced, use the enhanced structure
+        if item.get('enhanced'):
+            if item.get('business_context'):
+                content_parts.append(f"Context: {item['business_context']}")
+            
+            if item.get('content_type'):
+                content_parts.append(f"Type: {item['content_type']}")
+            
+            if item.get('title'):
+                content_parts.append(f"Page: {item['title']}")
+            
+            if item.get('key_information'):
+                key_info = ', '.join(str(k) for k in item['key_information'])
+                content_parts.append(f"Key Information: {key_info}")
+            
+            # Add the enhanced main content (convert to string if it's a dict)
+            if item.get('main_content'):
+                main_content = item['main_content']
+                if isinstance(main_content, dict):
+                    # Convert dict to formatted string
+                    import json
+                    main_content = json.dumps(main_content, indent=2, ensure_ascii=False)
+                content_parts.append(str(main_content))
+        else:
+            # Fall back to original logic for non-enhanced content
+            # Add title
+            if item.get('title'):
+                content_parts.append(f"Page: {item['title']}")
+            
+            # Add description from metadata if available
+            if item.get('metadata', {}).get('description'):
+                content_parts.append(f"Description: {item['metadata']['description']}")
+            
+            # Process headings hierarchically
+            if item.get('headings'):
+                current_section = []
+                for heading in item['headings']:
+                    level = int(heading['level'].replace('h', ''))
+                    text = heading['text']
+                    current_section = current_section[:level-1] + [text]
+                    content_parts.append(f"Section {' > '.join(current_section)}")
+            
+            # Add main content with proper context
+            if item.get('main_content'):
+                content_parts.append(f"Content: {item['main_content']}")
             
         return "\n\n".join(content_parts)
 
@@ -129,7 +170,34 @@ class DataProcessingAgent:
             if not scraped_data:
                 raise ValueError("No data found to process")
             
-            # Prepare documents
+            # AI Enhancement step
+            if self.enable_ai_enhancement and self.enhancer:
+                logger.info("=" * 60)
+                logger.info("🤖 AI CONTENT ENHANCEMENT")
+                logger.info("=" * 60)
+                
+                # Show cost estimate
+                cost_estimate = self.enhancer.estimate_cost(scraped_data)
+                logger.info(f"📊 Enhancement Statistics:")
+                logger.info(f"   • Pages to enhance: {cost_estimate['pages_count']}")
+                logger.info(f"   • Model: {cost_estimate['model']}")
+                logger.info(f"   • Est. input tokens: {cost_estimate['estimated_input_tokens']:,}")
+                logger.info(f"   • Est. output tokens: {cost_estimate['estimated_output_tokens']:,}")
+                logger.info(f"   • Est. cost per page: ${cost_estimate['cost_per_page']}")
+                logger.info(f"   💰 Total estimated cost: ${cost_estimate['estimated_cost_usd']}")
+                logger.info("=" * 60)
+                
+                # Enhance content
+                scraped_data = await self.enhancer.enhance_batch(scraped_data)
+                
+                # Save enhanced data for inspection
+                enhanced_file = 'web_scraping_results_enhanced.json'
+                with open(enhanced_file, 'w', encoding='utf-8') as f:
+                    json.dump(scraped_data, f, ensure_ascii=False, indent=2)
+                logger.info(f"💾 Saved enhanced data to {enhanced_file}")
+                logger.info("=" * 60)
+            
+            # Prepare documents (now with enhanced content)
             documents = self._prepare_documents(scraped_data)
             logger.info(f"Prepared {len(documents)} documents")
             

@@ -239,3 +239,4 @@ If streaming causes issues, quick rollback:
 
 The system now provides a significantly better user experience with real-time streaming responses while maintaining all existing functionality for non-English queries. 🎉
 
+

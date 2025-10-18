@@ -75,3 +75,4 @@ print("✅ ALL CHECKS PASSED - Responses API is available!")
 print("=" * 60)
 print("\n🚀 You can use streaming responses with the Responses API")
 
+

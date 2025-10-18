@@ -31,6 +31,7 @@ pydantic>=2.5.3
 requests>=2.31.0
 aiohttp>=3.9.1
 psutil>=5.9.6
+tenacity>=8.2.0  # For retry logic in content enhancement
 
 # Optional: For crawl_agent.py (not currently integrated)
 # crawl4ai>=0.3.0  # Uncomment if you plan to use crawl_agent.py
